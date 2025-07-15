@@ -1,6 +1,5 @@
 import { STUDY_TYPE_CONTENT_TABLE } from "/configs/schema";
 import { db } from "/configs/db";
-import { inngest } from "/inngest/client";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
@@ -127,28 +126,45 @@ Give me in .md format
 
     console.log("Prompt:", PROMPT);
 
-    // Insert into the database
+    // Insert into the database with initial status
     const result = await db
       .insert(STUDY_TYPE_CONTENT_TABLE)
       .values({
         courseId: courseId,
         type: type,
-        chapter: chapter, // Add chapter for better traceability
+        chapter: chapter,
+        status: "Generating" // Set initial status
       })
       .returning({ id: STUDY_TYPE_CONTENT_TABLE.id });
 
     console.log("Inserted Content ID:", result);
 
-    // Trigger the external task
-    await inngest.send({
-      name: "studyType.content",
-      data: {
-        studyType: type,
-        prompt: PROMPT,
-        courseId: courseId,
-        recordId: result[0]?.id,
-      },
-    });
+    // CHANGED: Call direct API instead of Inngest
+    try {
+      // Get the base URL for the API call
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      
+      // Trigger study content generation in background
+      fetch(`${baseUrl}/api/generate-study-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recordId: result[0]?.id,
+          studyType: type,
+          prompt: PROMPT,
+          courseId: courseId
+        }),
+      }).catch(error => {
+        console.error("Background study content generation failed:", error);
+      });
+
+      console.log("Background study content generation triggered for type:", type, "recordId:", result[0]?.id);
+    } catch (error) {
+      console.error("Failed to trigger background generation:", error);
+    }
 
     return NextResponse.json({ id: result[0]?.id });
   } catch (error) {

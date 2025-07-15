@@ -16,6 +16,7 @@ function GamifiedQuiz() {
   const [stepCount, setStepCount] = useState(0);
   const [quizData, setQuizData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState([]);
   const [isCorrect, setIsCorrect] = useState(null);
@@ -45,7 +46,7 @@ function GamifiedQuiz() {
       });
       
       if (result.data && result.data.content && result.data.content.questions) {
-        setQuizData(result.data);
+        setQuizData({ content: result.data.content });
         setSelectedOptions(
           Array(result.data.content.questions.length).fill(null)
         );
@@ -68,6 +69,7 @@ function GamifiedQuiz() {
       setLoading(false);
     } catch (error) {
       console.log("Note: Quiz data couldn't be loaded:", error.message || "Unknown error");
+      setError("Failed to load quiz data. Please try again later.");
       
       setQuizData({
         content: {

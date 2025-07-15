@@ -1,4 +1,3 @@
-import { inngest } from "/inngest/client";
 import { courseOutlineAIModel } from "/configs/AiModel";
 import { db } from "/configs/db";
 import { STUDY_MATERIAL_TABLE } from "/configs/schema";
@@ -32,18 +31,36 @@ export async function POST(req) {
         courseType,
         createdBy,
         topic,
-        courseLayout: aiResult, // Ensure the AI response contains 'courseLayout'
+        courseLayout: aiResult,
+        status: "Generating" // Set initial status
       })
       .returning();
 
     console.log("Database insertion result:", dbResult);
 
-    const result = await inngest.send({
-      name: "notes.generate",
-      data: {
-        course: dbResult[0], // Adjusting for the correct returned object structure
-      },
-    });
+    // CHANGED: Call direct API instead of Inngest
+    try {
+      // Get the base URL for the API call
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      
+      // Trigger course content generation in background
+      fetch(`${baseUrl}/api/generate-course-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId: dbResult[0].courseId
+        }),
+      }).catch(error => {
+        console.error("Background course generation failed:", error);
+      });
+
+      console.log("Background course generation triggered for courseId:", dbResult[0].courseId);
+    } catch (error) {
+      console.error("Failed to trigger background generation:", error);
+    }
 
     return NextResponse.json({ result: dbResult[0] });
   } catch (error) {
