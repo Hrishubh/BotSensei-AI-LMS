@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, ChevronRight, Lightbulb, RotateCcw, Send, Sparkles } from 'lucide-react';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const mathSuggestions = [
   "Solve x² - 7x + 12 = 0",
@@ -196,8 +198,41 @@ export default function MathAiPage() {
                       <span className="text-xs font-medium text-amber-500 dark:text-amber-400">BotSensei Math Assistant</span>
                     </div>
                   )}
-                  <div className={`prose-sm prose whitespace-pre-wrap max-w-none ${message.role === 'assistant' ? 'text-gray-800 dark:text-gray-100' : ''}`}>
-                    {message.content}
+                  <div className={`prose prose-sm max-w-none ${message.role === 'assistant' ? 'text-gray-800 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-code:text-blue-600 dark:prose-code:text-blue-400 prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800' : ''}`}>
+                    {message.role === 'assistant' ? (
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // Custom styling for code blocks
+                          code: ({node, inline, className, children, ...props}) => {
+                            return inline ? (
+                              <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono text-blue-600 dark:text-blue-400" {...props}>
+                                {children}
+                              </code>
+                            ) : (
+                              <code className="block p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-mono overflow-x-auto" {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          // Custom styling for headings
+                          h1: ({children}) => <h1 className="text-xl font-bold mb-2 text-gray-900 dark:text-gray-100">{children}</h1>,
+                          h2: ({children}) => <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-base font-medium mb-1 text-gray-900 dark:text-gray-100">{children}</h3>,
+                          // Custom styling for lists
+                          ul: ({children}) => <ul className="list-disc list-inside space-y-1 mb-2">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside space-y-1 mb-2">{children}</ol>,
+                          // Custom styling for paragraphs
+                          p: ({children}) => <p className="mb-2 leading-relaxed">{children}</p>,
+                          // Custom styling for strong text
+                          strong: ({children}) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      message.content
+                    )}
                   </div>
                 </div>
               </div>

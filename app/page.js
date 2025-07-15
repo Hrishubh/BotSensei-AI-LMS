@@ -2,7 +2,6 @@
 
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
@@ -144,7 +143,7 @@ export default function Home() {
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   aria-label="Toggle theme"
                 >
-                  {mounted && theme === 'dark' ? <Sun className="text-gray-200" size={20} /> : <Moon size={20} />}
+                  {mounted && theme == 'dark' ? <Sun className="text-gray-200" size={20} /> : <Moon size={20} />}
                 </button>
               )}
               
@@ -200,7 +199,7 @@ export default function Home() {
                 </div>
               ) : (
                 <div>
-                  <SignInButton mode="modal">
+                  <SignInButton>
                     <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-4 sm:px-6 py-2 rounded-lg transition-all shadow-lg hover:shadow-blue-500/25">
                       Get Started
                     </button>

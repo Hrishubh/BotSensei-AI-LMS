@@ -18,7 +18,18 @@ const outfit = Outfit({subsets:['latin']});
 
 export default function RootLayout({ children }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        baseTheme: undefined, // Will be set dynamically
+        variables: {
+          colorPrimary: '#3b82f6',
+          borderRadius: '0.75rem'
+        }
+      }}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      forceRedirectUrl="/dashboard"
+    >
       <html lang="en" className="light" suppressHydrationWarning>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />

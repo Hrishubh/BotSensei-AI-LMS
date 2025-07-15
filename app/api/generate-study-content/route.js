@@ -40,23 +40,40 @@ export async function POST(req) {
     }
 
     try {
-      // Generate content using AI
-      console.log(`Using AI model for ${studyType} generation...`);
-      const result = await aiModel.sendMessage(prompt);
-      const aiResponse = result.response.text();
+      // Retry logic for AI generation
+      const generateWithRetry = async (model, prompt, retryCount = 0) => {
+        try {
+          console.log(`Using AI model for ${studyType} generation... (attempt ${retryCount + 1}/3)`);
+          const result = await model.sendMessage(prompt);
+          const aiResponse = result.response.text();
+          
+          // Parse AI response
+          try {
+            const aiResult = JSON.parse(aiResponse);
+            console.log(`Successfully generated and parsed ${studyType} content`);
+            return aiResult;
+          } catch (parseError) {
+            console.error("Failed to parse AI response:", parseError);
+            if (retryCount < 2) {
+              throw new Error("Invalid JSON format, will retry");
+            }
+            throw new Error("AI returned invalid JSON format after multiple attempts");
+          }
+        } catch (error) {
+          if (retryCount < 2) { // 3 total attempts (0, 1, 2)
+            const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+            console.log(`${studyType} generation failed, retrying in ${delay}ms (attempt ${retryCount + 2}/3): ${error.message}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return generateWithRetry(model, prompt, retryCount + 1);
+          }
+          throw error; // Final failure after 3 attempts
+        }
+      };
+
+      // Generate content using AI with retry logic
+      const aiResult = await generateWithRetry(aiModel, prompt);
       
       console.log(`AI generation completed for ${studyType}`);
-      
-      // Parse AI response
-      let aiResult;
-      try {
-        aiResult = JSON.parse(aiResponse);
-        console.log(`Successfully parsed AI response for ${studyType}`);
-      } catch (parseError) {
-        console.error("Failed to parse AI response:", parseError);
-        console.error("AI Response:", aiResponse);
-        throw new Error("AI returned invalid JSON format");
-      }
 
       // Update database with generated content
       await db

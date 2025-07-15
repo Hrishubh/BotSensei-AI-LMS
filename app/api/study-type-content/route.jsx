@@ -1,5 +1,6 @@
 import { STUDY_TYPE_CONTENT_TABLE } from "/configs/schema";
 import { db } from "/configs/db";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
@@ -132,7 +133,6 @@ Give me in .md format
       .values({
         courseId: courseId,
         type: type,
-        chapter: chapter,
         status: "Generating" // Set initial status
       })
       .returning({ id: STUDY_TYPE_CONTENT_TABLE.id });
@@ -145,25 +145,70 @@ Give me in .md format
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
                      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
       
-      // Trigger study content generation in background
-      fetch(`${baseUrl}/api/generate-study-content`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          recordId: result[0]?.id,
-          studyType: type,
-          prompt: PROMPT,
-          courseId: courseId
-        }),
-      }).catch(error => {
-        console.error("Background study content generation failed:", error);
+      console.log("Attempting to trigger study content generation with baseUrl:", baseUrl);
+      
+      // Retry logic for background API calls
+      const triggerWithRetry = async (url, payload, retryCount = 0) => {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          console.log("Background study content generation started successfully");
+          return await response.json();
+        } catch (error) {
+          if (retryCount < 2) { // 3 total attempts
+            const delay = Math.pow(2, retryCount) * 2000; // 2s, 4s, 8s
+            console.log(`Background API call failed, retrying in ${delay}ms (attempt ${retryCount + 2}/3): ${error.message}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return triggerWithRetry(url, payload, retryCount + 1);
+          }
+          throw error; // Final failure
+        }
+      };
+      
+      // Trigger study content generation with retry
+      triggerWithRetry(`${baseUrl}/api/generate-study-content`, {
+        recordId: result[0]?.id,
+        studyType: type,
+        prompt: PROMPT,
+        courseId: courseId
+      }).catch(async (error) => {
+        console.error("Background study content generation failed after all retries:", error);
+        
+        // CRITICAL: Update status to Error if all retries fail
+        try {
+          await db
+            .update(STUDY_TYPE_CONTENT_TABLE)
+            .set({ status: "Error" })
+            .where(eq(STUDY_TYPE_CONTENT_TABLE.id, result[0]?.id));
+          console.log("Updated study content status to Error due to background call failure");
+        } catch (dbError) {
+          console.error("Failed to update study content status after background failure:", dbError);
+        }
       });
 
       console.log("Background study content generation triggered for type:", type, "recordId:", result[0]?.id);
     } catch (error) {
       console.error("Failed to trigger background generation:", error);
+      
+      // CRITICAL: Update status to Error if we can't even make the call
+      try {
+        await db
+          .update(STUDY_TYPE_CONTENT_TABLE)
+          .set({ status: "Error" })
+          .where(eq(STUDY_TYPE_CONTENT_TABLE.id, result[0]?.id));
+      } catch (dbError) {
+        console.error("Failed to update study content status:", dbError);
+      }
     }
 
     return NextResponse.json({ id: result[0]?.id });

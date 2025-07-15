@@ -73,8 +73,23 @@ Give me in .md format
 - All generated content should be focused on clarity and exam preparation, with minimal redundancy.
 - Double-check for mismatched brackets, missing fields, or improperly formatted strings.`;
 
-        const result = await generateNotesAiModel.sendMessage(PROMPT);
-        const aiResp = await result.response.text();
+        // Retry logic for AI generation
+        const generateWithRetry = async (prompt, retryCount = 0) => {
+          try {
+            const result = await generateNotesAiModel.sendMessage(prompt);
+            return await result.response.text();
+          } catch (error) {
+            if (retryCount < 2) { // 3 total attempts (0, 1, 2)
+              const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+              console.log(`Chapter ${index + 1} failed, retrying in ${delay}ms (attempt ${retryCount + 2}/3)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return generateWithRetry(prompt, retryCount + 1);
+            }
+            throw error; // Final failure after 3 attempts
+          }
+        };
+
+        const aiResp = await generateWithRetry(PROMPT);
 
         // Insert notes into database
         await db.insert(CHAPTER_NOTES_TABLE).values({
